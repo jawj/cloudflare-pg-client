@@ -1,6 +1,8 @@
-import { Buffer } from "./build/buffer.js";
-import { deferred } from "./build/deferred.js";
-import { __Deferred as Deferred } from "./build/types-package";
+// import { Buffer } from "./build/buffer.js";
+// import { deferred } from "./build/deferred.js";
+// import { __Deferred as Deferred } from "./build/types-package";
+
+import WsTls from '../src/wstls';
 
 declare namespace Deno {
   export interface Reader {
@@ -70,41 +72,41 @@ declare namespace Deno {
   }
 }
 
+type WsTlsInstance = Awaited<ReturnType<typeof WsTls>>;
+
 export class TcpOverWebsocketConn implements Deno.Conn {
   localAddr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 5432 };
   remoteAddr: Deno.Addr = { transport: "tcp", hostname: "172.17.0.2", port: 5432 };
   rid: number = 1;
 
-  ws: WebSocket;
-  buffer: Buffer;
-  empty_notifier: Deferred<void>;
+  ws: WsTlsInstance;
+  // buffer: Buffer;
+  // empty_notifier: Deferred<void>;
 
-  constructor(ws: WebSocket) {
+  constructor(ws: WsTlsInstance) {
     this.ws = ws;
-
-    this.buffer = new Buffer();
-
-    this.empty_notifier = deferred();
+    // this.buffer = new Buffer();
+    // this.empty_notifier = deferred();
 
     // Incoming messages get written to a buffer
-    this.ws.addEventListener("message", (msg: any) => {
-      const data = new Uint8Array(msg.data);
+    // this.ws.addEventListener("message", (msg: any) => {
+    //   const data = new Uint8Array(msg.data);
 
-      this.buffer.write(data).then(() => {
-        this.empty_notifier.resolve();
-      });
-    });
+    //   this.buffer.write(data).then(() => {
+    //     this.empty_notifier.resolve();
+    //   });
+    // });
 
-    this.ws.addEventListener("error", (err) => {
-      console.log("ws error");
-    });
-    this.ws.addEventListener("close", () => {
-      this.empty_notifier.resolve();
-      console.log("ws close");
-    });
-    this.ws.addEventListener("open", () => {
-      console.log("ws open");
-    });
+    // this.ws.addEventListener("error", (err) => {
+    //   console.log("ws error");
+    // });
+    // this.ws.addEventListener("close", () => {
+    //   this.empty_notifier.resolve();
+    //   console.log("ws close");
+    // });
+    // this.ws.addEventListener("open", () => {
+    //   console.log("ws open");
+    // });
   }
 
   closeWrite(): Promise<void> {
@@ -112,30 +114,36 @@ export class TcpOverWebsocketConn implements Deno.Conn {
   }
 
   // Reads up to p.length bytes from our buffer
-  read(p: Uint8Array): Promise<number | null> {
-    //If the buffer is empty, we need to block until there is data
-    if (this.buffer.length === 0) {
-      return new Promise(async (resolve, reject) => {
-        this.empty_notifier = deferred();
-        await this.empty_notifier;
+  async read(p: Uint8Array) {
+    const bytesRead = await this.ws.readData(p);
+    return bytesRead;
 
-        if (this.buffer.length === 0) {
-          reject(0); // TODO what is the correct way to handle errors
-        } else {
-          const bytes = await this.buffer.read(p);
-          resolve(bytes);
-        }
-      });
-    } else {
-      return this.buffer.read(p);
-    }
+    //If the buffer is empty, we need to block until there is data
+    // if (this.buffer.length === 0) {
+    //   return new Promise(async (resolve, reject) => {
+    //     this.empty_notifier = deferred();
+    //     await this.empty_notifier;
+
+    //     if (this.buffer.length === 0) {
+    //       reject(0); // TODO what is the correct way to handle errors
+    //     } else {
+    //       const bytes = await this.buffer.read(p);
+    //       resolve(bytes);
+    //     }
+    //   });
+    // } else {
+    //   return this.buffer.read(p);
+    // }
   }
 
-  write(p: Uint8Array): Promise<number> {
-    this.ws.send(p);
+  async write(p: Uint8Array) {
+    await this.ws.writeData(p);
+    return p.length;
+
+    // this.ws.send(p);
 
     // We have to assume the socket buffered our entire message
-    return Promise.resolve(p.byteLength);
+    // return Promise.resolve(p.byteLength);
   }
 
   close(): void {
@@ -146,35 +154,33 @@ export class TcpOverWebsocketConn implements Deno.Conn {
 export const workerDenoPostgres_startTls = function (
   connection: Deno.Conn
 ): Promise<Deno.Conn> {
+
+  // return Promise.resolve(connection);
+
+  (connection as any).ws.startTls();
   return Promise.resolve(connection);
 };
 
-export const workerDenoPostgres_connect = function (
+export const workerDenoPostgres_connect = async function (
   options: Deno.ConnectOptions
 ): Promise<Deno.Conn> {
-  return new Promise<Deno.Conn>((resolve, reject) => {
+
     if (options.hostname === undefined) {
       throw new Error("Tunnel hostname undefined");
     }
-    let hostname = options.hostname
-    let wsAddr = `ws://proxy.hahathon.monster/?name=${options.hostname}:${options.port}`
-    console.log("Connecting to", wsAddr);
 
-    const ws = new WebSocket(wsAddr);
-    ws.addEventListener("open", () => {
-      resolve(new TcpOverWebsocketConn(ws));
-    });
+    const wsProxy = 'http://proxy.hahathon.monster/';
+    const wsTls = await WsTls(options.hostname, options.port, wsProxy, true);
 
-    ws.addEventListener("error", (err) => {
-      reject(err);
-    });
+    return new TcpOverWebsocketConn(wsTls);
 
-    
+    // let wsAddr = `http://localhost:9090/?name=${options.hostname}:${options.port}`
+    // console.log("Connecting to", wsAddr);
 
     // const resp = fetch(wsAddr, {
     //   headers: {
     //     Upgrade: "websocket",
-    //   },
+    //   }
     // })
     //   .then((resp) => {
     //     // N.B. `webSocket` property exists on Workers `Response` type.
@@ -192,7 +198,5 @@ export const workerDenoPostgres_connect = function (
     //     console.log((e as Error).message);
     //     reject(e); //TODO error handling
     //   });
-
     // return resp;
-  });
 };

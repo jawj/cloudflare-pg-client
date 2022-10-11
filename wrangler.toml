@@ -1,3 +1,19 @@
 name = "pg"
 main = "src/index.ts"
 compatibility_date = "2022-09-29"
+
+[vars]
+
+DB_USER = "jawj"
+DB_HOST = "frosty-bird-713157.cloud.neon.tech"
+DB_PORT = 5432  # default: 5432
+DB_DATABASE = "main"  # default: "main"
+
+# DB_PASSWORD
+# In general: run `wrangler secret put DB_PASSWORD` and enter the password when prompted.
+# For `wrangler dev --local`: create `.dev.vars` containing `DBPASSWORD=mysecretpassword`.
+
+# DB_USER = "george"
+# DB_HOST = "localhost"
+# DB_PORT = 5435
+# DB_DATABASE = "pagila"

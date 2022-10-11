@@ -1,14 +1,5 @@
 import { Client } from '@bubblydoo/cloudflare-workers-postgres-client';
-
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `wrangler dev src/index.ts` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `wrangler publish src/index.ts --name my-worker` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+// import WsTls from './wstls';
 
 export interface Env {
 	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
@@ -19,84 +10,56 @@ export interface Env {
 	//
 	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
 	// MY_BUCKET: R2Bucket;
-}
 
-const createClient = () => {
-	// return new Client({
-	// 	user: "petuhovskiy@zenith",
-	// 	database: "main",
-	// 	hostname: "dry-mountain-455633.cloud.neon.tech",
-	// 	port: 5432,
-	// 	password: "Cbfyq5ec6tmk"
-	//   });
-	return new Client({
-		user: "postgres",
-		database: "postgres",
-		hostname: "18.192.67.124",
-		port: 5432,
-		password: "your-super-secret-password"
-	});
-
-
-	// return new Client({
-	//   user: 'petuhovskiy%40zenith',
-	//   database: 'main',
-	//   hostname: 'http://proxy.hahathon.monster/?name=dry-mountain-455633.cloud.neon.tech:5432',
-	//   password: 'Cbfyq5ec6tmk',
-	//   port: 5432,
-	// });
+	DB_USER: string;
+	DB_PASSWORD: string;
+	DB_HOST: string;
+	DB_PORT?: number;
+	DB_DATABASE?: string;
 }
 
 export default {
-	async fetch(
-		request: Request,
-		env: Env,
-		ctx: ExecutionContext
-	): Promise<Response> {
-		// const socket = new WebSocket('ws://snake.rwlist.io:8080/ws?name=tick');
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		/*
+			const host = 'neon.tech';
+			const port = 443;
+			const wsProxy = 'http://proxy.hahathon.monster/';
+	
+			const wsTls = await WsTls(host, port, wsProxy);
+			wsTls.startTls();
+	
+			const getReqBuf = new TextEncoder()
+				.encode(`GET / HTTP/1.0\r\nHost: ${host}\r\n\r\n`);  // UTF8
+			await wsTls.writeData(getReqBuf);
+	
+			const te = new TextDecoder();  // UTF8
+			const data = new Uint8Array(16709);
+			let html = '';
+			while (true) {
+				const bytesRead = await wsTls.readData(data);
+				if (bytesRead <= 0) break;
+	
+				const str = te.decode(data.subarray(0, bytesRead));
+				html += str;
+			}
+	
+			return new Response(html, {
+				headers: {
+					'content-type': 'text/plain',
+					'X-Content-Type-Options': 'nosniff'
+				}
+			});
+			*/
 
-		// // Connection opened
-		// socket.addEventListener('open', (event) => {
-		// socket.send('Hello Server!');
-		// });
-
-		// let test_var;
-		// // Listen for messages
-		// socket.addEventListener('message', (event) => {
-		// 	console.log('Message from server ', event.data);
-		// 	test_var = event.data;
-		// });
-
-		// await new Promise(r => setTimeout(r, 2000));
-
-		// return new Response(JSON.stringify({ test_var }), {
-		// headers: { "Content-Type": "application/json" },
-		// });
-
-
-
-		// const client = createClient();
-
-		// await client.connect()
-
-
-		// // const array_result = await client.queryArray("SELECT * FROM log_records LIMIT 10");
-		// const array_result = await client.queryArray("SELECT 42");
-		// console.log(array_result.rows); // [[1, 'Carlos'], [2, 'John'], ...]
-
-		//   // const object_result = await client.queryObject("SELECT ID, NAME FROM PEOPLE");
-		//   // console.log(object_result.rows); // [{id: 1, name: 'Carlos'}, {id: 2, name: 'John'}, ...]
-
-		// await client.end();
-
-		// return new Response(JSON.stringify({
-		// 	rows: array_result.rows,
-		// 	request: request,
-		// }));
-
-
-		const client = createClient();
+		const client = new Client({
+			user: env.DB_USER,
+			password: env.DB_PASSWORD,
+			hostname: env.DB_HOST,
+			port: env.DB_PORT ?? 5432,
+			database: env.DB_DATABASE ?? 'main',
+		});
 		await client.connect();
+
 		const url = new URL(request.url);
 		const { pathname, search, href } = url;
 		const param_name = "?query=";
@@ -104,21 +67,28 @@ export default {
 		if (search.startsWith(param_name)) {
 			let query = search.slice(param_name.length);
 			console.log(`${query}`);
+
 			const array_result = await client.queryArray(query);
 			console.log(array_result.rows);
+
 			await client.end();
+
 			return new Response(JSON.stringify({
 				original_query: query,
 				rows: array_result.rows,
 			}, null, 2));
+
 		} else {
-			const array_result = await client.queryArray("SELECT 42");
+			const array_result = await client.queryArray("SELECT url FROM urls");
 			console.log(array_result.rows);
+
 			await client.end();
+
 			return new Response(JSON.stringify({
 				rows: array_result.rows,
 				request
-			}));
+			}, null, 2));
 		}
+
 	},
 };
