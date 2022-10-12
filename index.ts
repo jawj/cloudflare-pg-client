@@ -1,4 +1,4 @@
-import { Client } from '@bubblydoo/cloudflare-workers-postgres-client';
+import { Client } from './pg/postgres';
 
 export interface Env {
 	DB_USER: string;

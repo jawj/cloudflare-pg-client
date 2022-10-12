@@ -1,5 +1,5 @@
 name = "pg"
-main = "src/index.ts"
+main = "index.ts"
 compatibility_date = "2022-09-29"
 
 [vars]

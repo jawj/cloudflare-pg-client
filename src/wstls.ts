@@ -1,4 +1,4 @@
-import { bearssl_emscripten } from '../worker/bearssl.js';
+import { bearssl_emscripten } from '../build/bearssl.js';
 
 // import bearsslwasm from '../worker/bearssl.wasm';
 // ^^^ note: we'll be adding this import back in after esbuild compilation, so as not to 
