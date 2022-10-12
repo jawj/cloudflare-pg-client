@@ -19,13 +19,10 @@ export default {
 		});
 		await client.connect();
 
-		const url = new URL(request.url);
-		const { pathname, search, href } = url;
-		const param_name = "?query=";
-
 		const array_result = await client.queryArray("SELECT 42");
 		console.log(array_result.rows);
-
+		
+		// TODO: reduce latency by doing this after returning results?
 		await client.end();
 
 		return new Response(JSON.stringify({
@@ -35,7 +32,7 @@ export default {
 
 
 		/*
-		// this example fetches a web page over https
+		// this example fetches a web page over https instead
 		
 		const host = 'neon.tech';
 		const port = 443;
@@ -62,7 +59,7 @@ export default {
 		return new Response(html, {
 			headers: {
 				'content-type': 'text/plain',
-				'X-Content-Type-Options': 'nosniff'
+				'X-Content-Type-Options': 'nosniff',
 			}
 		});
 		*/
