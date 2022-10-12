@@ -9,6 +9,9 @@ declare global {
   interface Response {
     webSocket: WebSocket;  // Cloudflare-specific
   }
+  interface WebSocket {
+    accept: () => void;
+  }
 }
 
 interface DataRequest {
@@ -29,8 +32,6 @@ export default (async function (
   wsProxy: string, // e.g. http://localhost:9090/
   verbose = false,
 ) {
-  let module: any;
-  let socket: any;
   let tlsStarted = false;
 
   const incomingDataQueue: Uint8Array[] = [];
@@ -78,65 +79,64 @@ export default (async function (
     resolve(len);
   }
 
-  module = await bearssl_emscripten({
-    instantiateWasm(info: any, receive: any) {
-      if (verbose) console.log('loading wasm');
-      let instance = new WebAssembly.Instance(bearsslwasm, info);
-      receive(instance);
-      return instance.exports;
-    },
+  const wsAddr = `${wsProxy}?name=${host}:${port}`;
+  const [resp, module] = await Promise.all([
+    // start websocket connection
+    fetch(wsAddr, { headers: { Upgrade: 'websocket' } }),
 
-    provideEncryptedFromNetwork(buf: number, maxBytes: number) {
-      if (verbose) console.log(`provideEncryptedFromNetwork: providing up to ${maxBytes} bytes`);
+    // init wasm module
+    bearssl_emscripten({
+      instantiateWasm(info: any, receive: any) {
+        if (verbose) console.log('loading wasm');
 
-      return new Promise(resolve => {
-        outstandingDataRequest = { container: buf, maxBytes, resolve };
-        dequeueIncomingData();
-      });
-    },
+        let instance = new WebAssembly.Instance(bearsslwasm, info);
+        receive(instance);
 
-    writeEncryptedToNetwork(buf: number, size: number) {
-      if (verbose) console.log(`writeEncryptedToNetwork: writing ${size} bytes`);
+        return instance.exports;
+      },
 
-      const arr = module.HEAPU8.slice(buf, buf + size);
-      socket.send(arr);
+      provideEncryptedFromNetwork(buf: number, maxBytes: number) {
+        if (verbose) console.log(`provideEncryptedFromNetwork: providing up to ${maxBytes} bytes`);
 
-      return size;
-    },
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    const wsAddr = `${wsProxy}?name=${host}:${port}`;
-    fetch(wsAddr, { headers: { Upgrade: 'websocket' } })
-      .then(resp => {
-        socket = resp.webSocket;
-        socket.accept();
-        socket.binaryType = 'arraybuffer';
-        resolve();
-
-        socket.addEventListener('error', (err: any) => {
-          reject(err);
-        });
-
-        socket.addEventListener('close', () => {
-          if (verbose) console.log('socket: disconnected');
-          if (outstandingDataRequest) {
-            // TODO: consider whether this is possible and, if so, whether this is the right way to handle it
-            outstandingDataRequest.resolve(0);
-            outstandingDataRequest = null;
-          }
-        });
-
-        socket.addEventListener('message', (msg: any) => {
-          const data = new Uint8Array(msg.data);
-          if (verbose) console.log(`socket: ${data.length} bytes received`);
-          incomingDataQueue.push(data);
+        return new Promise(resolve => {
+          outstandingDataRequest = { container: buf, maxBytes, resolve };
           dequeueIncomingData();
         });
-      })
-      .catch(reason => {
-        throw new Error(`WebSocket connection failed: ${reason}`);
-      });
+      },
+
+      writeEncryptedToNetwork(buf: number, size: number) {
+        if (verbose) console.log(`writeEncryptedToNetwork: writing ${size} bytes`);
+
+        const arr = module.HEAPU8.slice(buf, buf + size);
+        socket.send(arr);
+
+        return size;
+      },
+    }),
+  ]);
+  
+  const socket = resp.webSocket;
+  socket.accept();
+  socket.binaryType = 'arraybuffer';
+
+  socket.addEventListener('error', (err: any) => {
+    throw err;
+  });
+
+  socket.addEventListener('close', () => {
+    if (verbose) console.log('socket: disconnected');
+    if (outstandingDataRequest) {
+      // TODO: consider whether this is possible and, if so, whether this is the right way to handle it
+      outstandingDataRequest.resolve(0);
+      outstandingDataRequest = null;
+    }
+  });
+
+  socket.addEventListener('message', (msg: any) => {
+    const data = new Uint8Array(msg.data);
+    if (verbose) console.log(`socket: ${data.length} bytes received`);
+    incomingDataQueue.push(data);
+    dequeueIncomingData();
   });
 
   const tls = {
@@ -153,7 +153,7 @@ export default (async function (
       const entropyLen = 128;
       const entropy = new Uint8Array(entropyLen);
       crypto.getRandomValues(entropy);
-      return tls.initTls(host, entropy, entropyLen) as number; 
+      return tls.initTls(host, entropy, entropyLen) as number;
     },
 
     async writeData(data: Uint8Array) {
