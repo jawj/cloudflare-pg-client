@@ -89,14 +89,10 @@ export default (async function (
     provideEncryptedFromNetwork(buf: number, maxBytes: number) {
       if (verbose) console.log(`provideEncryptedFromNetwork: providing up to ${maxBytes} bytes`);
 
-      let resolve: ((bytesProvided: number) => void);
-      const promise = new Promise(r => resolve = r);
-
-      // @ts-ignore -- TypeScript seems not to appreciate that `new Promise(x)` calls `x` synchronously
-      outstandingDataRequest = { container: buf, maxBytes, resolve };
-      dequeueIncomingData();
-
-      return promise;
+      return new Promise(resolve => {
+        outstandingDataRequest = { container: buf, maxBytes, resolve };
+        dequeueIncomingData();
+      });
     },
 
     writeEncryptedToNetwork(buf: number, size: number) {
@@ -125,7 +121,7 @@ export default (async function (
         socket.addEventListener('close', () => {
           if (verbose) console.log('socket: disconnected');
           if (outstandingDataRequest) {
-            // TODO: consider whether this is possible and, if so, whether this is the right way to handle it!
+            // TODO: consider whether this is possible and, if so, whether this is the right way to handle it
             outstandingDataRequest.resolve(0);
             outstandingDataRequest = null;
           }
@@ -151,13 +147,13 @@ export default (async function (
 
   return {
     startTls() {
+      // note: BearSSL doesn't actually do anything at this point; it only starts a handshake when we next read/write
       if (verbose) console.log('initialising TLS');
       tlsStarted = true;
       const entropyLen = 128;
       const entropy = new Uint8Array(entropyLen);
       crypto.getRandomValues(entropy);
-      return tls.initTls(host, entropy, entropyLen) as number;
-      // note: BearSSL doesn't actually do anything at this point; it only starts a handshake once we read/write
+      return tls.initTls(host, entropy, entropyLen) as number; 
     },
 
     async writeData(data: Uint8Array) {
@@ -189,14 +185,10 @@ export default (async function (
       } else {
         if (verbose) console.log('raw readData');
 
-        let resolve: (bytesProvided: number) => void;
-        const promise = new Promise<number>(r => resolve = r);
-
-        // @ts-ignore -- TypeScript seems not to appreciate that `new Promise(x)` calls `x` synchronously
-        outstandingDataRequest = { container: data, maxBytes, resolve };
-        dequeueIncomingData();
-
-        return promise;
+        return new Promise<number>(resolve => {
+          outstandingDataRequest = { container: data, maxBytes, resolve };
+          dequeueIncomingData();
+        });
       }
     },
 
