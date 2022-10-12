@@ -1,12 +1,27 @@
-// @ts-ignore -- TypeScript doesn't understand WASM imports
-// import bearsslwasm from '../worker/bearssl.wasm';
 import { bearssl_emscripten } from '../worker/bearssl.js';
 
+// import bearsslwasm from '../worker/bearssl.wasm';
+// ^^^ note: we'll be adding this import back in after esbuild compilation, so as not to 
+// confuse esbuild with the way Cloudflare Workers handle this
+
 declare global {
+  const bearsslwasm: any;
   interface Response {
     webSocket: WebSocket;
   }
 }
+
+interface DataRequest {
+  container: number /* emscripten buffer pointer */ | Uint8Array;
+  maxBytes: number;
+  resolve: (bytesProvided: number) => void;
+}
+
+/**
+ * This object handles communication with an emscripten-compiled TLS library.
+ * Data flow is somewhat complex, since we're turning new data events into async read calls,
+ * and the read and write data paths can either go via the TLS library (after initTLS) or not.
+ */
 
 export default (async function (
   host: string,
@@ -18,10 +33,8 @@ export default (async function (
   let socket: any;
   let tlsStarted = false;
 
-  const incomingDataQueue: Uint8Array[] = []
-  let emBuf: number /* pointer */ | Uint8Array | null = null;
-  let emMaxSize = 0;
-  let emResolve: null | ((bytesSent: number) => void) = null;
+  const incomingDataQueue: Uint8Array[] = [];
+  let outstandingDataRequest: DataRequest | null = null;
 
   function dequeueIncomingData() {
     if (verbose) console.log('dequeue ...');
@@ -30,55 +43,64 @@ export default (async function (
       if (verbose) console.log('no data available');
       return;
     }
-    if (emResolve === null || emBuf === null) {
-      if (verbose) console.log('no data awaited');
+    if (outstandingDataRequest === null) {
+      if (verbose) console.log('data available but not awaited');
       return;
     }
 
     let nextData = incomingDataQueue[0];
-    if (nextData.length > emMaxSize) {
-      incomingDataQueue[0] = nextData.subarray(emMaxSize);
-      nextData = nextData.subarray(0, emMaxSize);
+    const { container, maxBytes, resolve } = outstandingDataRequest;
+
+    if (nextData.length > maxBytes) {
+      if (verbose) console.log('splitting next chunk');
+      incomingDataQueue[0] = nextData.subarray(maxBytes);
+      nextData = nextData.subarray(0, maxBytes);
 
     } else {
+      if (verbose) console.log('returning next chunk whole');
       incomingDataQueue.shift();
     }
 
     if (tlsStarted) {
-      module.HEAPU8.set(nextData, emBuf);
+      if (verbose) console.log('providing data to wasm for decryption');
+      module.HEAPU8.set(nextData, container);  // copy data to appropriate memory range
 
     } else {
-      (emBuf as Uint8Array).set(nextData);
+      if (verbose) console.log('providing data direct');
+      (container as Uint8Array).set(nextData);
     }
 
-    const resolve = emResolve;
-    emResolve = emBuf = null;
-    emMaxSize = 0;
+    outstandingDataRequest = null;
 
-    const len = nextData.length
+    const len = nextData.length;
     if (verbose) console.log(`${len} bytes dequeued`);
+
     resolve(len);
   }
 
   module = await bearssl_emscripten({
     instantiateWasm(info: any, receive: any) {
-      // @ts-ignore -- TypeScript doesn't understand this, which is fair enough
+      if (verbose) console.log('loading wasm');
       let instance = new WebAssembly.Instance(bearsslwasm, info);
       receive(instance);
       return instance.exports;
     },
-    provideEncryptedFromNetwork(buf: number, maxSize: number) {
-      if (verbose) console.info(`provideEncryptedFromNetwork: providing up to ${maxSize} bytes`);
 
-      emBuf = buf;
-      emMaxSize = maxSize;
-      const promise = new Promise(resolve => emResolve = resolve);
+    provideEncryptedFromNetwork(buf: number, maxBytes: number) {
+      if (verbose) console.log(`provideEncryptedFromNetwork: providing up to ${maxBytes} bytes`);
 
+      let resolve: ((bytesProvided: number) => void);
+      const promise = new Promise(r => resolve = r);
+
+      // @ts-ignore -- TypeScript seems not to appreciate that `new Promise(x)` calls `x` synchronously
+      outstandingDataRequest = { container: buf, maxBytes, resolve };
       dequeueIncomingData();
+
       return promise;
     },
+
     writeEncryptedToNetwork(buf: number, size: number) {
-      if (verbose) console.info(`writeEncryptedToNetwork: writing ${size} bytes`);
+      if (verbose) console.log(`writeEncryptedToNetwork: writing ${size} bytes`);
 
       const arr = module.HEAPU8.slice(buf, buf + size);
       socket.send(arr);
@@ -91,7 +113,6 @@ export default (async function (
     const wsAddr = `${wsProxy}?name=${host}:${port}`;
     fetch(wsAddr, { headers: { Upgrade: 'websocket' } })
       .then(resp => {
-        // `webSocket` property exists on Workers `Response` type
         socket = resp.webSocket;
         socket.accept();
         socket.binaryType = 'arraybuffer';
@@ -100,13 +121,18 @@ export default (async function (
         socket.addEventListener('error', (err: any) => {
           reject(err);
         });
+
         socket.addEventListener('close', () => {
-          if (verbose) console.info('socket: disconnected');
-          if (emResolve) emResolve(0);
+          if (verbose) console.log('socket: disconnected');
+          if (outstandingDataRequest) {
+            outstandingDataRequest.resolve(0);
+            outstandingDataRequest = null;
+          }
         });
+
         socket.addEventListener('message', (msg: any) => {
           const data = new Uint8Array(msg.data);
-          if (verbose) console.info(`socket: ${data.length} bytes received`);
+          if (verbose) console.log(`socket: ${data.length} bytes received`);
           incomingDataQueue.push(data);
           dequeueIncomingData();
         });
@@ -124,7 +150,7 @@ export default (async function (
 
   return {
     startTls() {
-      if (verbose) console.info('initialising TLS');
+      if (verbose) console.log('initialising TLS');
       tlsStarted = true;
       const entropyLen = 128;
       const entropy = new Uint8Array(entropyLen);
@@ -134,47 +160,46 @@ export default (async function (
 
     async writeData(data: Uint8Array) {
       if (tlsStarted) {
-        if (verbose) console.info('writeData: encrypted');
+        if (verbose) console.log('TLS writeData');
         const status = await tls.writeData(data, data.length);
         return status as 0 | -1;
 
       } else {
-        if (verbose) console.info('writeData: unencrypted');
+        if (verbose) console.log('raw writeData');
         socket.send(data);
         return 0;
       }
     },
 
     async readData(data: Uint8Array) {
-
-      // TO CONSIDER: if we could set a global maxBytes, we could avoid repeated allocations, 
-      // and even build the buffer into the C file (allowing us to compile without ALLOW_MEMORY_GROWTH) 
-
-      // 16709 is BR_SSL_BUFSIZE_INPUT in bearssl_ssl.h
-
-      const maxSize = data.length;
+      const maxBytes = data.length;
 
       if (tlsStarted) {
-        if (verbose) console.info('readData: encrypted');
-        const buf = module._malloc(maxSize);
-        const bytesRead = await tls.readData(buf, maxSize);
+        if (verbose) console.log('TLS readData');
+
+        const buf = module._malloc(maxBytes);
+        const bytesRead = await tls.readData(buf, maxBytes);
         data.set(module.HEAPU8.subarray(buf, buf + bytesRead));
+        module._free(buf);
+
         return bytesRead;
 
       } else {
-        if (verbose) console.info('readData: unencrypted');
-        emBuf = data;
-        emMaxSize = maxSize;
-        const promise = new Promise<number>(resolve => emResolve = resolve);
+        if (verbose) console.log('raw readData');
 
+        let resolve: (bytesProvided: number) => void;
+        const promise = new Promise<number>(r => resolve = r);
+
+        // @ts-ignore -- TypeScript seems not to appreciate that `new Promise(x)` calls `x` synchronously
+        outstandingDataRequest = { container: data, maxBytes, resolve };
         dequeueIncomingData();
+
         return promise;
       }
-
-      // TODO: stop leaking buf!
     },
 
     close() {
+      if (verbose) console.log('requested close');
       socket.close();
     }
   };

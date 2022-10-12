@@ -10,8 +10,8 @@ DB_PORT = 5432  # default: 5432
 DB_DATABASE = "main"  # default: "main"
 
 # DB_PASSWORD
-# In general: run `wrangler secret put DB_PASSWORD` and enter the password when prompted.
-# For `wrangler dev --local`: create `.dev.vars` containing `DBPASSWORD=mysecretpassword`.
+# Run `wrangler secret put DB_PASSWORD` and enter the password when prompted.
+# And/or for `wrangler dev --local`: create `.dev.vars` containing `DBPASSWORD=mysecretpassword`.
 
 # DB_USER = "george"
 # DB_HOST = "localhost"
