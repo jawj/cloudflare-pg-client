@@ -5,9 +5,9 @@ import { bearssl_emscripten } from '../worker/bearssl.js';
 // confuse esbuild with the way Cloudflare Workers handle this
 
 declare global {
-  const bearsslwasm: any;
+  const bearsslwasm: any;  // we'll add this import back in later, see above
   interface Response {
-    webSocket: WebSocket;
+    webSocket: WebSocket;  // Cloudflare-specific
   }
 }
 
