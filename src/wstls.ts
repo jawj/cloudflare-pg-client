@@ -125,6 +125,7 @@ export default (async function (
         socket.addEventListener('close', () => {
           if (verbose) console.log('socket: disconnected');
           if (outstandingDataRequest) {
+            // TODO: consider whether this is possible and, if so, whether this is the right way to handle it!
             outstandingDataRequest.resolve(0);
             outstandingDataRequest = null;
           }
@@ -156,6 +157,7 @@ export default (async function (
       const entropy = new Uint8Array(entropyLen);
       crypto.getRandomValues(entropy);
       return tls.initTls(host, entropy, entropyLen) as number;
+      // note: BearSSL doesn't actually do anything at this point; it only starts a handshake once we read/write
     },
 
     async writeData(data: Uint8Array) {
