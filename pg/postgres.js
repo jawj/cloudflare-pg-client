@@ -317,10 +317,10 @@ var bearssl_emscripten = (() => {
         var exports2 = instance.exports;
         exports2 = Asyncify.instrumentWasmExports(exports2);
         Module["asm"] = exports2;
-        wasmMemory = Module["asm"]["g"];
+        wasmMemory = Module["asm"]["f"];
         updateGlobalBufferAndViews(wasmMemory.buffer);
-        wasmTable = Module["asm"]["l"];
-        addOnInit(Module["asm"]["h"]);
+        wasmTable = Module["asm"]["k"];
+        addOnInit(Module["asm"]["g"]);
         removeRunDependency("wasm-instantiate");
       }
       addRunDependency("wasm-instantiate");
@@ -395,9 +395,6 @@ var bearssl_emscripten = (() => {
     }
     function _emscripten_date_now() {
       return Date.now();
-    }
-    function _emscripten_memcpy_big(dest, src, num) {
-      HEAPU8.copyWithin(dest, src, src + num);
     }
     function getHeapMax() {
       return 2147483648;
@@ -690,49 +687,49 @@ var bearssl_emscripten = (() => {
         return ccall(ident, returnType, argTypes, arguments, opts);
       };
     }
-    var asmLibraryArg = { "f": __asyncjs__jsProvideEncryptedFromNetwork, "c": _emscripten_date_now, "d": _emscripten_memcpy_big, "b": _emscripten_resize_heap, "a": _fd_write, "e": jsWriteEncryptedToNetwork };
+    var asmLibraryArg = { "e": __asyncjs__jsProvideEncryptedFromNetwork, "c": _emscripten_date_now, "a": _emscripten_resize_heap, "b": _fd_write, "d": jsWriteEncryptedToNetwork };
     var asm = createWasm();
     var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
-      return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["h"]).apply(null, arguments);
+      return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["g"]).apply(null, arguments);
     };
     var _initTls = Module["_initTls"] = function() {
-      return (_initTls = Module["_initTls"] = Module["asm"]["i"]).apply(null, arguments);
+      return (_initTls = Module["_initTls"] = Module["asm"]["h"]).apply(null, arguments);
     };
     var _writeData = Module["_writeData"] = function() {
-      return (_writeData = Module["_writeData"] = Module["asm"]["j"]).apply(null, arguments);
+      return (_writeData = Module["_writeData"] = Module["asm"]["i"]).apply(null, arguments);
     };
     var _readData = Module["_readData"] = function() {
-      return (_readData = Module["_readData"] = Module["asm"]["k"]).apply(null, arguments);
+      return (_readData = Module["_readData"] = Module["asm"]["j"]).apply(null, arguments);
     };
     var _malloc = Module["_malloc"] = function() {
-      return (_malloc = Module["_malloc"] = Module["asm"]["m"]).apply(null, arguments);
+      return (_malloc = Module["_malloc"] = Module["asm"]["l"]).apply(null, arguments);
     };
     var _free = Module["_free"] = function() {
-      return (_free = Module["_free"] = Module["asm"]["n"]).apply(null, arguments);
+      return (_free = Module["_free"] = Module["asm"]["m"]).apply(null, arguments);
     };
     var stackSave = Module["stackSave"] = function() {
-      return (stackSave = Module["stackSave"] = Module["asm"]["o"]).apply(null, arguments);
+      return (stackSave = Module["stackSave"] = Module["asm"]["n"]).apply(null, arguments);
     };
     var stackRestore = Module["stackRestore"] = function() {
-      return (stackRestore = Module["stackRestore"] = Module["asm"]["p"]).apply(null, arguments);
+      return (stackRestore = Module["stackRestore"] = Module["asm"]["o"]).apply(null, arguments);
     };
     var stackAlloc = Module["stackAlloc"] = function() {
-      return (stackAlloc = Module["stackAlloc"] = Module["asm"]["q"]).apply(null, arguments);
+      return (stackAlloc = Module["stackAlloc"] = Module["asm"]["p"]).apply(null, arguments);
     };
     var _asyncify_start_unwind = Module["_asyncify_start_unwind"] = function() {
-      return (_asyncify_start_unwind = Module["_asyncify_start_unwind"] = Module["asm"]["r"]).apply(null, arguments);
+      return (_asyncify_start_unwind = Module["_asyncify_start_unwind"] = Module["asm"]["q"]).apply(null, arguments);
     };
     var _asyncify_stop_unwind = Module["_asyncify_stop_unwind"] = function() {
-      return (_asyncify_stop_unwind = Module["_asyncify_stop_unwind"] = Module["asm"]["s"]).apply(null, arguments);
+      return (_asyncify_stop_unwind = Module["_asyncify_stop_unwind"] = Module["asm"]["r"]).apply(null, arguments);
     };
     var _asyncify_start_rewind = Module["_asyncify_start_rewind"] = function() {
-      return (_asyncify_start_rewind = Module["_asyncify_start_rewind"] = Module["asm"]["t"]).apply(null, arguments);
+      return (_asyncify_start_rewind = Module["_asyncify_start_rewind"] = Module["asm"]["s"]).apply(null, arguments);
     };
     var _asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = function() {
-      return (_asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = Module["asm"]["u"]).apply(null, arguments);
+      return (_asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = Module["asm"]["t"]).apply(null, arguments);
     };
-    var ___start_em_js = Module["___start_em_js"] = 14260;
-    var ___stop_em_js = Module["___stop_em_js"] = 14652;
+    var ___start_em_js = Module["___start_em_js"] = 14632;
+    var ___stop_em_js = Module["___stop_em_js"] = 15024;
     Module["ccall"] = ccall;
     Module["cwrap"] = cwrap;
     var calledRun;

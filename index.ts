@@ -1,5 +1,14 @@
 import { Client } from './pg/postgres';
 
+declare global {
+  interface Request {
+    cf: {
+      latitude: string | null;
+      longitude: string | null;
+    };
+  }
+}
+
 export interface Env {
   DB_USER: string;
   DB_PASSWORD: string;
@@ -17,13 +26,15 @@ export default {
       port: env.DB_PORT ?? 5432,
       database: env.DB_DATABASE ?? 'main',
     });
+    
     await client.connect();
     const array_result = await client.queryArray("SELECT 42");
     ctx.waitUntil(client.end());
 
     return new Response(JSON.stringify({
       rows: array_result.rows,
-      request
+      lat: request.cf.latitude,
+      lng: request.cf.longitude,
     }, null, 2));
 
     /*

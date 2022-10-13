@@ -16,7 +16,7 @@ Notes on `build.sh`:
 
 * To build only the TS/JS parts, use `./build.sh quick`.
 
-* For debugging purposes, you can edit the file to add `-DCHATTY` (which dumps all read/write data in hex) and/or remove `-O3` in the `emcc` command. Wireshark can also prove useful.
+* For debugging purposes, you can edit the file to add `-DCHATTY` (which dumps all read/write data in hex) and/or remove `-Oz` in the `emcc` command. Wireshark may also prove useful.
 
 * Emscripten's `-sEXPORT_ES6` option looks like it should be useful, but it creates problems in Cloudflare Workers, so we don't use it. Instead, we use `sed` to hack in an `export` and delete the last few lines referring to `module.exports` etc.
 

@@ -9,7 +9,8 @@ if [ "$1" != "quick" ]; then
     -sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
     -sASYNCIFY=1 -sDYNAMIC_EXECUTION=0 -sALLOW_MEMORY_GROWTH=1 \
     -sNO_FILESYSTEM=1 -sENVIRONMENT=web \
-    -sMODULARIZE=1 -sEXPORT_NAME=bearssl_emscripten -O3 # -DCHATTY
+    -sMODULARIZE=1 -sEXPORT_NAME=bearssl_emscripten -flto \
+    -Oz # -DCHATTY
 
   echo "Fixing up exports ..."
   sed \
