@@ -1,11 +1,11 @@
-import { bearssl_emscripten } from '../build/bearssl.js';
+import { tls_emscripten } from '../build/tls.js';
 
-// import bearsslwasm from '../worker/bearssl.wasm';
+// import tlswasm from '../worker/tls.wasm';
 // ^^^ note: we'll be adding this import back in after esbuild compilation, so as not to 
 // confuse esbuild with the way Cloudflare Workers handle this
 
 declare global {
-  const bearsslwasm: any;  // we'll add this import back in later, see above
+  const tlswasm: any;  // we'll add this import back in later, see above
   interface Response {
     webSocket: WebSocket;  // Cloudflare-specific
   }
@@ -85,11 +85,11 @@ export default (async function (
     fetch(wsAddr, { headers: { Upgrade: 'websocket' } }),
 
     // init wasm module
-    bearssl_emscripten({
+    tls_emscripten({
       instantiateWasm(info: any, receive: any) {
         if (verbose) console.log('loading wasm');
 
-        let instance = new WebAssembly.Instance(bearsslwasm, info);
+        let instance = new WebAssembly.Instance(tlswasm, info);
         receive(instance);
 
         return instance.exports;
