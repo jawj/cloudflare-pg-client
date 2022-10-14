@@ -1,8 +1,8 @@
-This repo patches the deno-postgres library to work within a Cloudflare Worker, by redirecting TCP traffic over a WebSocket.
+This repo patches the deno-postgres library to work within a Cloudflare Worker by redirecting TCP traffic via a WebSocket-to-TCP tunnel.
 
-Since a TLS connection is required for security, we support this by compiling either [BearSSL](https://bearssl.org/) or [WolfSSL](https://www.wolfssl.com/) to wasm using [emscripten](https://emscripten.org/).
+Since a TLS connection is required for security, we support this by compiling either [BearSSL](https://bearssl.org/) or [WolfSSL](https://www.wolfssl.com/) to wasm using [emscripten](https://emscripten.org/). Currently we embed only the ISRG X1 Root cert, which means we can validate Let's Encrypt-secured connections.
 
-In general, BearSSL is slightly smaller and slightly slower. In testing from the UK, BearSSL (using TLS 1.2 only) weighs in at 311 KB (JS + wasm) and a request to a worker that make a DB query takes around 1500ms, while WolfSSL (compiled for TLS 1.3 only) comes to 390 KB (JS + wasm) and a request takes around 1300ms. We are therefore favouring WolfSSL.
+Overall, BearSSL is slightly smaller and slightly slower, while WolfSSL is slightly larger and slightly faster. BearSSL (using TLS 1.2 only) weighs in at 311 KB (JS + wasm), while WolfSSL (compiled for TLS 1.3 only) comes to 390 KB (JS + wasm). In one set of tests, a request to a worker that makes a long-distance DB query using BearSSL typically took 1500ms, while one using WolfSSL took around 1300ms. This likely makes WolfSSL a better bet.
 
 # HOW TO
 
