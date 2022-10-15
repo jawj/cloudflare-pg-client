@@ -103,12 +103,12 @@ export class TcpOverWebsocketConn implements Deno.Conn {
   }
 }
 
-export const workerDenoPostgres_startTls = function (
+export const workerDenoPostgres_startTls = async function (
   connection: Deno.Conn
 ): Promise<Deno.Conn> {
 
-  (connection as any).ws.startTls();
-  return Promise.resolve(connection);
+  await (connection as any).ws.startTls();
+  return connection;
 };
 
 export const workerDenoPostgres_connect = async function (

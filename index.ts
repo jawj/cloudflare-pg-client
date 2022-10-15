@@ -19,6 +19,9 @@ export interface Env {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === '/favicon.ico') return new Response(null, { status: 404 });
+
     const client = new Client({
       user: env.DB_USER,
       password: env.DB_PASSWORD,
@@ -28,14 +31,14 @@ export default {
     });
     
     await client.connect();
-    const array_result = await client.queryArray("SELECT 42");
+    const array_result = await client.queryArray("SELECT now()");
     ctx.waitUntil(client.end());
 
     return new Response(JSON.stringify({
       rows: array_result.rows,
       lat: request.cf.latitude,
       lng: request.cf.longitude,
-    }, null, 2));
+    }, null, 2), { headers: { 'Content-Type': 'application/json' } });
 
     /*
     // this example fetches a web page over https instead

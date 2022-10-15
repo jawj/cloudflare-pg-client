@@ -7,6 +7,7 @@
 br_ssl_client_context sc;
 br_x509_minimal_context xc;
 unsigned char iobuf[BR_SSL_BUFSIZE_BIDI];
+unsigned char entropy[128];
 br_sslio_context ioc;
 int ret;
 int err;
@@ -25,6 +26,11 @@ EM_JS(int, jsWriteEncryptedToNetwork, (const unsigned char *buf, size_t len), {
 
 EM_JS(int, jsReceiveDecryptedFromLibrary, (unsigned char *buf, size_t len), {
   Module.jsReceiveDecryptedFromLibrary(buf, len);
+});
+
+EM_JS(void, jsGetRandomBytes, (unsigned char *buf, size_t len), {
+  const arr = Module.HEAPU8.subarray(buf, buf + len);
+  crypto.getRandomBytes(arr);
 });
 
 
@@ -142,7 +148,7 @@ static const br_x509_trust_anchor TAs[1] = {
 
 // === TLS functions exposed to JavaScript ===
 
-int initTls(char *host, char *entropy, size_t entropyLen) {
+int initTls(char *host) {
   br_ssl_client_init_full(&sc, &xc, TAs, TAs_NUM);
   br_ssl_engine_set_versions(&sc.eng, BR_TLS12, BR_TLS12);  // TLS 1.2 only, please
 
@@ -156,7 +162,8 @@ int initTls(char *host, char *entropy, size_t entropyLen) {
   };
   br_ssl_engine_set_suites(&sc.eng, suites, (sizeof suites) / (sizeof suites[0]));  
 
-  br_ssl_engine_inject_entropy(&sc.eng, entropy, entropyLen);  // required with emscripten
+  jsGetRandomBytes(&entropy, sizeof(entropy));
+  br_ssl_engine_inject_entropy(&sc.eng, entropy, sizeof(entropy));  // required with emscripten
   br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
 
   ret = br_ssl_client_reset(&sc, host, 0);

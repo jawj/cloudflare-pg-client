@@ -1,10 +1,5 @@
 #!/usr/bin/env zsh -e
 
-# (1) download WolfSSL from GitHub releases and untar/unzip into `../wolfssl-5.5.1-stable`
-# (2) install emscripten in `../emsdk`
-# (3) `brew install autoconf automake libtool`
-# (4) run this script
-
 cd ../wolfssl-5.5.1-stable
 
 echo "Patching wolfscript/src/random.c to use crypto.getRandomBytes() ..."
@@ -13,9 +8,8 @@ sed \
   -e '1s/^/#include <emscripten.h>\n/' \
   -e 's/#error "you need to write an os specific wc_GenerateSeed() here"/ \
     EM_JS(int, wc_GenerateSeed, (OS_Seed* os, byte* output, word32 sz), { \
-        const entropy = new Uint8Array(sz); \
+        const entropy = Module.HEAPU8.subarray(output, output + sz); \
         crypto.getRandomValues(entropy); \
-        Module.HEAPU8.set(entropy, output); \
         return 0; \
     }); \
   /' \

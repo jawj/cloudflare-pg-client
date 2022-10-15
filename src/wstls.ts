@@ -109,7 +109,7 @@ export default (async function (
 
         const arr = module.HEAPU8.slice(buf, buf + size);
         socket.send(arr);
-
+        
         return size;
       },
     }),
@@ -140,20 +140,18 @@ export default (async function (
   });
 
   const tls = {
-    initTls: module.cwrap('initTls', 'number', ['string', 'array', 'number']),  // host, entropy, entropy length
+    initTls: module.cwrap('initTls', 'number', ['string'], { async: true }),  // host
     writeData: module.cwrap('writeData', 'number', ['array', 'number'], { async: true }) as (data: Uint8Array, length: number) => Promise<number>,
     readData: module.cwrap('readData', 'number', ['number', 'number'], { async: true }) as (pointer: number, length: number) => Promise<number>,
   };
 
   return {
-    startTls() {
-      // note: BearSSL doesn't actually do anything at this point; it only starts a handshake when we next read/write
+    async startTls() {
+      // note: WolfSSL handshakes right away; BearSSL only starts the handshake when we next read/write
       if (verbose) console.log('initialising TLS');
       tlsStarted = true;
-      const entropyLen = 128;
-      const entropy = new Uint8Array(entropyLen);
-      crypto.getRandomValues(entropy);
-      return tls.initTls(host, entropy, entropyLen) as number;
+      const result = await tls.initTls(host);
+      return result;
     },
 
     async writeData(data: Uint8Array) {

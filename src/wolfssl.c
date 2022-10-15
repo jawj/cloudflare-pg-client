@@ -102,8 +102,14 @@ void cleanup() {
 }
 
 int initTls(char *tlsHost) {
+    #ifdef CHATTY
+        puts("WolfSSL initializing ...");
+    #endif
     wolfSSL_Init();
 
+    #ifdef CHATTY
+        puts("WolfSSL creating context ...");
+    #endif
     ctx = wolfSSL_CTX_new(wolfTLS_client_method());
     if (ctx == NULL) {
         fprintf(stderr, "ERROR: failed to create WOLFSSL_CTX\n");
@@ -111,15 +117,24 @@ int initTls(char *tlsHost) {
         goto exit;
     }
 
+    #ifdef CHATTY
+        puts("WolfSSL loading verify buffer ...");
+    #endif
     ret = wolfSSL_CTX_load_verify_buffer(ctx, rootCert, sizeof(rootCert), WOLFSSL_FILETYPE_PEM);
     if (ret != WOLFSSL_SUCCESS) {
         fprintf(stderr, "ERROR: failed to load cert, please check the buffer.\n");
         goto exit;
     }
 
+    #ifdef CHATTY
+        puts("Setting I/O callbacks ...");
+    #endif
     wolfSSL_SetIORecv(ctx, my_IORecv);
     wolfSSL_SetIOSend(ctx, my_IOSend);
 
+    #ifdef CHATTY
+        puts("Creating SSL object ...");
+    #endif
     ssl = wolfSSL_new(ctx);
     if (ssl == NULL) {
         fprintf(stderr, "ERROR: failed to create WOLFSSL object\n");
@@ -127,25 +142,46 @@ int initTls(char *tlsHost) {
         goto exit;
     }
 
+    #ifdef CHATTY
+        puts("Setting ciphers ...");
+    #endif
+    ret = wolfSSL_set_cipher_list(ssl, "TLS13-CHACHA20-POLY1305-SHA256");
+    if (ret != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "ERROR: failed to set ciphers\n");
+        goto exit;
+    }
+
+    #ifdef CHATTY
+        puts("Enabling SNI ...");
+    #endif
     ret = wolfSSL_UseSNI(ssl, WOLFSSL_SNI_HOST_NAME, tlsHost, strlen(tlsHost));
     if (ret != WOLFSSL_SUCCESS) {
         fprintf(stderr, "ERROR: failed to set host for SNI\n");
         goto exit;
     }
 
+    #ifdef CHATTY
+        puts("Enabling domain name check...");
+    #endif
     ret = wolfSSL_check_domain_name(ssl, tlsHost);
     if (ret != WOLFSSL_SUCCESS) {
         puts("Failed to enable domain name check");
         goto exit;
     };
 
+    #ifdef CHATTY
+        puts("Connecting ...");
+    #endif
     ret = wolfSSL_connect(ssl);
     if (ret != WOLFSSL_SUCCESS) {
         int err = wolfSSL_get_error(ssl, ret);
         fprintf(stderr, "ERROR: failed to connect to wolfSSL, error %i\n", err);
         goto exit;
     }
-    
+
+    const char *cipher = wolfSSL_get_cipher_name(ssl);
+    printf("WolfSSL connected with cipher: %s\n", cipher);
+
     return 0;
 
 exit:

@@ -2,17 +2,17 @@
 
 if [ "$1" != "quick" ]; then
   echo "Compiling WolfSSL to WASM ..."
-    emcc -c -I../wolfssl-5.5.1-stable/ src/wolfssl.c -o build/tls.o
+    emcc -c -I../wolfssl-5.5.1-stable/ src/wolfssl.c -o build/tls.o -Oz # -DCHATTY
 
     emcc build/tls.o \
       ../wolfssl-5.5.1-stable/wolfcrypt/src/*.o ../wolfssl-5.5.1-stable/src/*.o \
       -o build/tls.js \
       -sEXPORTED_FUNCTIONS=_initTls,_writeData,_readData,_malloc,_free \
-    -sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
-    -sASYNCIFY=1 -sDYNAMIC_EXECUTION=0 -sALLOW_MEMORY_GROWTH=1 \
-    -sNO_FILESYSTEM=1 -sENVIRONMENT=web \
-    -sMODULARIZE=1 -sEXPORT_NAME=tls_emscripten -flto \
-    -Oz # -DCHATTY
+      -sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
+      -sASYNCIFY=1 -sDYNAMIC_EXECUTION=0 -sALLOW_MEMORY_GROWTH=1 \
+      -sNO_FILESYSTEM=1 -sENVIRONMENT=web \
+      -sMODULARIZE=1 -sEXPORT_NAME=tls_emscripten -flto \
+      -Oz
 
   echo "Fixing up exports ..."
   sed \
