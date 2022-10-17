@@ -4,6 +4,18 @@
         "socket.h": "c",
         "netdb.h": "c",
         "emscripten.h": "c",
-        "options.h": "c"
+        "options.h": "c",
+        "bitset": "c",
+        "set": "c",
+        "cryptocb.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "vector": "c",
+        "cstddef": "c",
+        "valarray": "c",
+        "__node_handle": "c",
+        "__locale": "c",
+        "functional": "c"
     }
 }

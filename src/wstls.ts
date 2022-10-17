@@ -36,6 +36,7 @@ export default (async function (
 
   const incomingDataQueue: Uint8Array[] = [];
   let outstandingDataRequest: DataRequest | null = null;
+  let latestWritePromise = Promise.resolve(0);
 
   function dequeueIncomingData() {
     if (verbose) console.log('dequeue ...');
@@ -139,25 +140,20 @@ export default (async function (
     dequeueIncomingData();
   });
 
-  const tls = {
-    initTls: module.cwrap('initTls', 'number', ['string'], { async: true }),  // host
-    writeData: module.cwrap('writeData', 'number', ['array', 'number'], { async: true }) as (data: Uint8Array, length: number) => Promise<number>,
-    readData: module.cwrap('readData', 'number', ['number', 'number'], { async: true }) as (pointer: number, length: number) => Promise<number>,
-  };
-
   return {
     async startTls() {
       // note: WolfSSL handshakes right away; BearSSL only starts the handshake when we next read/write
       if (verbose) console.log('initialising TLS');
       tlsStarted = true;
-      const result = await tls.initTls(host);
+      const result = await module.ccall('initTls', 'number', ['string'], [host], { async: true });
       return result;
     },
 
     async writeData(data: Uint8Array) {
       if (tlsStarted) {
         if (verbose) console.log('TLS writeData');
-        const status = await tls.writeData(data, data.length);
+        latestWritePromise = module.ccall('writeData', 'number', ['array', 'number'], [data, data.length], { async: true });
+        const status = await latestWritePromise;
         return status as 0 | -1;
 
       } else {
@@ -169,20 +165,18 @@ export default (async function (
 
     async readData(data: Uint8Array) {
       const maxBytes = data.length;
+      await latestWritePromise;  // must ensure we don't read before writes are finished to avoid empscripten reentrancy
 
       if (tlsStarted) {
         if (verbose) console.log('TLS readData');
-
         const buf = module._malloc(maxBytes);
-        const bytesRead = await tls.readData(buf, maxBytes);
+        const bytesRead = await module.ccall('readData', 'number', ['number', 'number'], [buf, maxBytes], { async: true });
         data.set(module.HEAPU8.subarray(buf, buf + bytesRead));
         module._free(buf);
-
         return bytesRead;
 
       } else {
         if (verbose) console.log('raw readData');
-
         return new Promise<number>(resolve => {
           outstandingDataRequest = { container: data, maxBytes, resolve };
           dequeueIncomingData();

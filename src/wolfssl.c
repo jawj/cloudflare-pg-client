@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/cryptocb.h>
 
 unsigned char rootCert[] =
     "-----BEGIN CERTIFICATE-----\n"
@@ -51,10 +52,6 @@ EM_JS(int, jsWriteEncryptedToNetwork, (char *buff, int sz), {
     return bytesWritten;
 });
 
-EM_JS(int, jsReceiveDecryptedFromLibrary, (char *buff, int sz), {
-    Module.jsReceiveDecryptedFromLibrary(buff, sz);
-});
-
 int my_IORecv(WOLFSSL *ssl, char *buff, int sz, void *ctx) {
     int recvd = jsProvideEncryptedFromNetwork(buff, sz);
     if (recvd == -1) {
@@ -101,6 +98,106 @@ void cleanup() {
     wolfSSL_Cleanup();
 }
 
+EM_ASYNC_JS(void, jsSha256, (const unsigned char *buffDataIn, int sz, unsigned char *buffDigest), {
+    #ifdef CHATTY
+        console.log('crypto.subtle SHA256', buffDataIn, sz, buffDigest);
+    #endif
+    if (buffDataIn !== 0) {  // writing data
+        if (Module._digestStream == null) {
+            const stream = new crypto.DigestStream('SHA-256');
+            const writer = stream.getWriter();
+            Module._digestStream = { stream, writer };
+        }
+        const arrDataIn = Module.HEAPU8.subarray(buffDataIn, buffDataIn + sz);
+        await Module._digestStream.writer.write(arrDataIn);
+
+    } else {  // getting digest
+        const { stream, writer } = Module._digestStream;
+        await writer.close();
+        const digest = await stream.digest;
+        const arrDigest = new Uint8Array(digest);
+        Module.HEAPU8.set(arrDigest, buffDigest);
+        Module._digestStream = null;
+    } 
+});
+
+EM_ASYNC_JS(void, jsAesGcmEncrypt, (
+        const byte *dataBuff, 
+        int dataSz, 
+        const byte *keyBuff, 
+        int keySize, 
+        const byte *ivBuff, 
+        int ivSz, 
+        const byte *authInBuff, 
+        int authInSz, 
+        byte *authTagBuff, 
+        int authTagSz, 
+        byte *outBuff
+    ), {
+    #ifdef CHATTY
+        console.log('crypto.subtle encrypt');
+    #endif
+
+    const iv = Module.HEAPU8.subarray(ivBuff, ivBuff + ivSz);
+    const tagLength = authTagSz << 3;  // WolfSSL uses bytes, JS uses bits
+    const additionalData = Module.HEAPU8.subarray(authInBuff, authInBuff + authInSz);
+    const algorithm = { name: 'AES-GCM', iv, tagLength, additionalData };
+
+    const keyData = Module.HEAPU8.subarray(keyBuff, keyBuff + keySize);
+    const key = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt']);
+
+    const data = Module.HEAPU8.subarray(dataBuff, dataBuff + dataSz);
+    const resultArrBuff = await crypto.subtle.encrypt(algorithm, key, data);
+
+    const result = new Uint8Array(resultArrBuff);
+    const cipherText = result.subarray(0, dataSz);
+    const authTag = result.subarray(dataSz);
+    Module.HEAPU8.set(cipherText, outBuff);
+    Module.HEAPU8.set(authTag, authTagBuff);
+});
+
+int jsCb(int devId, wc_CryptoInfo *info, void* ctx) {
+    // TODO: test for WC_ALGO_TYPE_SEED here instead of patching WolfSSL source?
+    if (info->algo_type == WC_ALGO_TYPE_CIPHER && info->cipher.type == WC_CIPHER_AES_GCM && info->cipher.enc == 1) {
+        // printf("AES_GCM  enc: %i  rounds: %i  keylen: %i  out: %p  in: %p  sz: %i  iv: %p  ivSz: %i  authTag: %p  authTagSz: %i  authIn: %p  authInSz: %i\n", 
+        //   info->cipher.enc, 
+        //   info->cipher.aesgcm_enc.aes->rounds,
+        //   info->cipher.aesgcm_enc.aes->keylen,
+        //   info->cipher.aesgcm_enc.out,
+        //   info->cipher.aesgcm_enc.in,
+        //   info->cipher.aesgcm_enc.sz,
+        //   info->cipher.aesgcm_enc.iv,
+        //   info->cipher.aesgcm_enc.ivSz,
+        //   info->cipher.aesgcm_enc.authTag,
+        //   info->cipher.aesgcm_enc.authTagSz,
+        //   info->cipher.aesgcm_enc.authIn,
+        //   info->cipher.aesgcm_enc.authInSz
+        // );
+
+        jsAesGcmEncrypt(
+            info->cipher.aesgcm_enc.in, 
+            info->cipher.aesgcm_enc.sz, 
+            (byte *)info->cipher.aesgcm_enc.aes->devKey, 
+            info->cipher.aesgcm_enc.aes->keylen,
+            info->cipher.aesgcm_enc.iv, 
+            info->cipher.aesgcm_enc.ivSz, 
+            info->cipher.aesgcm_enc.authIn, 
+            info->cipher.aesgcm_enc.authInSz, 
+            info->cipher.aesgcm_enc.authTag, 
+            info->cipher.aesgcm_enc.authTagSz, 
+            info->cipher.aesgcm_enc.out
+        );
+        return 0;
+
+    } else if (info->algo_type == WC_ALGO_TYPE_HASH && info->hash.type == WC_HASH_TYPE_SHA256) {
+        jsSha256(info->hash.in, info->hash.inSz, info->hash.digest);
+        return 0;
+
+    } else {
+        return CRYPTOCB_UNAVAILABLE;
+    }
+}
+
 int initTls(char *tlsHost) {
     #ifdef CHATTY
         puts("WolfSSL initializing ...");
@@ -143,9 +240,20 @@ int initTls(char *tlsHost) {
     }
 
     #ifdef CHATTY
+        puts("Registering callback ...");
+    #endif
+    int devId = 1;
+    wc_CryptoCb_RegisterDevice(devId, &jsCb, NULL);
+    ret = wolfSSL_SetDevId(ssl, devId);
+    if (ret != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "ERROR: failed to register callback.\n");
+        goto exit;
+    }
+
+    #ifdef CHATTY
         puts("Setting ciphers ...");
     #endif
-    ret = wolfSSL_set_cipher_list(ssl, "TLS13-CHACHA20-POLY1305-SHA256");
+    ret = wolfSSL_set_cipher_list(ssl, "TLS13-AES128-GCM-SHA256:TLS13-AES256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256");
     if (ret != WOLFSSL_SUCCESS) {
         fprintf(stderr, "ERROR: failed to set ciphers\n");
         goto exit;
@@ -179,8 +287,10 @@ int initTls(char *tlsHost) {
         goto exit;
     }
 
-    const char *cipher = wolfSSL_get_cipher_name(ssl);
-    printf("WolfSSL connected with cipher: %s\n", cipher);
+    #ifdef CHATTY
+        const char *cipher = wolfSSL_get_cipher_name(ssl);
+        printf("WolfSSL connected with cipher: %s\n", cipher);
+    #endif
 
     return 0;
 

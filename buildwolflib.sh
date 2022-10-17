@@ -23,7 +23,7 @@ emconfigure ./configure \
   --disable-filesystem --disable-examples \
   --disable-oldtls --disable-tlsv12 \
   --enable-tls13 --enable-maxstrength --enable-sni --enable-altcertchains  \
-  --disable-asm --enable-fastmath --enable-static --disable-shared \
+  --disable-asm --enable-fastmath --enable-static --disable-shared --enable-cryptocb \
   CFLAGS="-DWOLFSSL_USER_IO -DSINGLETHREADED -DWOLFSSL_TLS13_MIDDLEBOX_COMPAT -DWOLFSSL_NO_ASYNC_IO -DNO_PSK \
     -DNO_WRITEV -DNO_WOLFSSL_SERVER -DNO_ERROR_STRINGS -DNO_DEV_RANDOM -DNO_DEV_URANDOM \
     -Oz -I../emsdk/upstream/emscripten/cache/sysroot/include -flto"
