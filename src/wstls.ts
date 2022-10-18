@@ -143,6 +143,7 @@ export default (async function (
   return {
     async startTls() {
       // note: WolfSSL handshakes right away; BearSSL only starts the handshake when we next read/write
+      // (that means some changes are needed for BearSSL, as this op is not async there)
       if (verbose) console.log('initialising TLS');
       tlsStarted = true;
       const result = await module.ccall('initTls', 'number', ['string'], [host], { async: true });
@@ -164,9 +165,9 @@ export default (async function (
     },
 
     async readData(data: Uint8Array) {
-      const maxBytes = data.length;
       await latestWritePromise;  // must ensure we don't read before writes are finished to avoid empscripten reentrancy
-
+      const maxBytes = data.length;
+      
       if (tlsStarted) {
         if (verbose) console.log('TLS readData');
         const buf = module._malloc(maxBytes);
