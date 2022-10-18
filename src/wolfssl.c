@@ -98,13 +98,14 @@ void cleanup() {
     wolfSSL_Cleanup();
 }
 
-EM_ASYNC_JS(void, jsSha256, (const byte *buffDataIn, int sz, byte *buffDigest), {
+EM_ASYNC_JS(void, jsSha, (int digestType, const byte *buffDataIn, int sz, byte *buffDigest), {
     #ifdef CHATTY
-        console.log('crypto.subtle SHA256', buffDataIn, sz, buffDigest);
+        console.log('crypto.subtle SHAx', digestType, buffDataIn, sz, buffDigest);
     #endif
     if (buffDataIn !== 0) {  // writing data
         if (Module._digestStream == null) {
-            const stream = new crypto.DigestStream('SHA-256');
+            const digestName = digestType === 6 ? 'SHA-256' : digestType === 7 ? 'SHA-384' : 'SHA-512';
+            const stream = new crypto.DigestStream(digestName);
             const writer = stream.getWriter();
             Module._digestStream = { stream, writer };
         }
@@ -198,7 +199,7 @@ EM_ASYNC_JS(int, jsAesGcmDecrypt, (
     }    
 });
 
-int jsCb(int devId, wc_CryptoInfo *info, void* ctx) {
+int cryptCb(int devId, wc_CryptoInfo *info, void* ctx) {
     // TODO: test for WC_ALGO_TYPE_SEED here instead of patching WolfSSL source?
     if (info->algo_type == WC_ALGO_TYPE_CIPHER && info->cipher.type == WC_CIPHER_AES_GCM) {
         if (info->cipher.enc == 1) {
@@ -269,8 +270,8 @@ int jsCb(int devId, wc_CryptoInfo *info, void* ctx) {
         }
         return 0;
 
-    } else if (info->algo_type == WC_ALGO_TYPE_HASH && info->hash.type == WC_HASH_TYPE_SHA256) {
-        jsSha256(info->hash.in, info->hash.inSz, info->hash.digest);
+    } else if (info->algo_type == WC_ALGO_TYPE_HASH && info->hash.type >= WC_HASH_TYPE_SHA256 && info->hash.type <= WC_HASH_TYPE_SHA512) {
+        jsSha(info->hash.type, info->hash.in, info->hash.inSz, info->hash.digest);
         return 0;
 
     } else {
@@ -323,7 +324,7 @@ int initTls(char *tlsHost) {
         puts("Registering callback ...");
     #endif
     int devId = 1;
-    wc_CryptoCb_RegisterDevice(devId, &jsCb, NULL);
+    wc_CryptoCb_RegisterDevice(devId, &cryptCb, NULL);
     ret = wolfSSL_SetDevId(ssl, devId);
     if (ret != WOLFSSL_SUCCESS) {
         fprintf(stderr, "ERROR: failed to register callback.\n");

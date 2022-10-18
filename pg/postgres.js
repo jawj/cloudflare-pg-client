@@ -389,11 +389,12 @@ import tlswasm from "./tls.wasm";var tls_emscripten = (() => {
       const bytesWritten = Module.writeEncryptedToNetwork(buff, sz);
       return bytesWritten;
     }
-    function __asyncjs__jsSha256(buffDataIn, sz, buffDigest) {
+    function __asyncjs__jsSha(digestType, buffDataIn, sz, buffDigest) {
       return Asyncify.handleAsync(async () => {
         if (buffDataIn !== 0) {
           if (Module._digestStream == null) {
-            const stream = new crypto.DigestStream("SHA-256");
+            const digestName = digestType === 6 ? "SHA-256" : digestType === 7 ? "SHA-384" : "SHA-512";
+            const stream = new crypto.DigestStream(digestName);
             const writer = stream.getWriter();
             Module._digestStream = { stream, writer };
           }
@@ -828,7 +829,7 @@ import tlswasm from "./tls.wasm";var tls_emscripten = (() => {
         return ccall(ident, returnType, argTypes, arguments, opts);
       };
     }
-    var asmLibraryArg = { "g": __asyncjs__jsAesGcmDecrypt, "h": __asyncjs__jsAesGcmEncrypt, "m": __asyncjs__jsProvideEncryptedFromNetwork, "f": __asyncjs__jsSha256, "d": __gmtime_js, "e": __tzset_js, "c": _emscripten_date_now, "j": _emscripten_resize_heap, "b": _fd_close, "i": _fd_seek, "k": _fd_write, "l": jsWriteEncryptedToNetwork, "a": wc_GenerateSeed };
+    var asmLibraryArg = { "g": __asyncjs__jsAesGcmDecrypt, "h": __asyncjs__jsAesGcmEncrypt, "m": __asyncjs__jsProvideEncryptedFromNetwork, "f": __asyncjs__jsSha, "d": __gmtime_js, "e": __tzset_js, "c": _emscripten_date_now, "j": _emscripten_resize_heap, "b": _fd_close, "i": _fd_seek, "k": _fd_write, "l": jsWriteEncryptedToNetwork, "a": wc_GenerateSeed };
     var asm = createWasm();
     var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
       return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["o"]).apply(null, arguments);
@@ -870,7 +871,7 @@ import tlswasm from "./tls.wasm";var tls_emscripten = (() => {
       return (_asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = Module["asm"]["B"]).apply(null, arguments);
     };
     var ___start_em_js = Module["___start_em_js"] = 19328;
-    var ___stop_em_js = Module["___stop_em_js"] = 22576;
+    var ___stop_em_js = Module["___stop_em_js"] = 22685;
     Module["ccall"] = ccall;
     Module["cwrap"] = cwrap;
     var calledRun;
