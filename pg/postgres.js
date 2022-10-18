@@ -389,12 +389,11 @@ import tlswasm from "./tls.wasm";var tls_emscripten = (() => {
       const bytesWritten = Module.writeEncryptedToNetwork(buff, sz);
       return bytesWritten;
     }
-    function __asyncjs__jsSha(digestType, buffDataIn, sz, buffDigest) {
+    function __asyncjs__jsSha(shaVersion, buffDataIn, sz, buffDigest) {
       return Asyncify.handleAsync(async () => {
         if (buffDataIn !== 0) {
           if (Module._digestStream == null) {
-            const digestName = digestType === 6 ? "SHA-256" : digestType === 7 ? "SHA-384" : "SHA-512";
-            const stream = new crypto.DigestStream(digestName);
+            const stream = new crypto.DigestStream(`SHA-${shaVersion}`);
             const writer = stream.getWriter();
             Module._digestStream = { stream, writer };
           }
@@ -870,8 +869,8 @@ import tlswasm from "./tls.wasm";var tls_emscripten = (() => {
     var _asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = function() {
       return (_asyncify_stop_rewind = Module["_asyncify_stop_rewind"] = Module["asm"]["B"]).apply(null, arguments);
     };
-    var ___start_em_js = Module["___start_em_js"] = 19328;
-    var ___stop_em_js = Module["___stop_em_js"] = 22685;
+    var ___start_em_js = Module["___start_em_js"] = 19392;
+    var ___stop_em_js = Module["___stop_em_js"] = 22666;
     Module["ccall"] = ccall;
     Module["cwrap"] = cwrap;
     var calledRun;

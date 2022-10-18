@@ -98,14 +98,13 @@ void cleanup() {
     wolfSSL_Cleanup();
 }
 
-EM_ASYNC_JS(void, jsSha, (int digestType, const byte *buffDataIn, int sz, byte *buffDigest), {
+EM_ASYNC_JS(void, jsSha, (int shaVersion, const byte *buffDataIn, int sz, byte *buffDigest), {
     #ifdef CHATTY
         console.log('crypto.subtle SHAx', digestType, buffDataIn, sz, buffDigest);
     #endif
     if (buffDataIn !== 0) {  // writing data
         if (Module._digestStream == null) {  // deliberate loose equality
-            const digestName = digestType === 6 ? 'SHA-256' : digestType === 7 ? 'SHA-384' : 'SHA-512';
-            const stream = new crypto.DigestStream(digestName);
+            const stream = new crypto.DigestStream(`SHA-${shaVersion}`);
             const writer = stream.getWriter();
             Module._digestStream = { stream, writer };
         }
@@ -270,11 +269,28 @@ int cryptCb(int devId, wc_CryptoInfo *info, void* ctx) {
         }
         return 0;
 
-    } else if (info->algo_type == WC_ALGO_TYPE_HASH && info->hash.type >= WC_HASH_TYPE_SHA256 && info->hash.type <= WC_HASH_TYPE_SHA512) {
-        jsSha(info->hash.type, info->hash.in, info->hash.inSz, info->hash.digest);
+    } else if (info->algo_type == WC_ALGO_TYPE_HASH && (
+        info->hash.type == WC_HASH_TYPE_SHA ||
+        info->hash.type == WC_HASH_TYPE_SHA256 || 
+        info->hash.type == WC_HASH_TYPE_SHA384 || 
+        info->hash.type == WC_HASH_TYPE_SHA512)) {
+
+        int shaVersion = 
+          info->hash.type == WC_HASH_TYPE_SHA256 ? 256 :
+          info->hash.type == WC_HASH_TYPE_SHA384 ? 384 : 
+          info->hash.type == WC_HASH_TYPE_SHA512 ? 512 : 1;
+        
+        jsSha(shaVersion, info->hash.in, info->hash.inSz, info->hash.digest);
         return 0;
 
     } else {
+        #ifdef CHATTY
+            printf("cb: algo_type %i\n", info->algo_type);
+            if (info->algo_type == WC_ALGO_TYPE_HASH) printf("hash.type %i\n\n", info->hash.type);
+            if (info->algo_type == WC_ALGO_TYPE_PK) printf("pk.type %i\n\n", info->pk .type);
+            if (info->algo_type == WC_ALGO_TYPE_HMAC) printf("hmac.macType %i\n\n", info->hmac.macType);
+            // potential further ops are ECC keygen (3, 9), ECDH (3, 3), RSA (3, 1) and SHA256-HMAC (6, 6)
+        #endif
         return CRYPTOCB_UNAVAILABLE;
     }
 }
