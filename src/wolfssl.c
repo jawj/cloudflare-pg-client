@@ -103,7 +103,7 @@ EM_ASYNC_JS(void, jsSha, (int digestType, const byte *buffDataIn, int sz, byte *
         console.log('crypto.subtle SHAx', digestType, buffDataIn, sz, buffDigest);
     #endif
     if (buffDataIn !== 0) {  // writing data
-        if (Module._digestStream == null) {
+        if (Module._digestStream == null) {  // deliberate loose equality
             const digestName = digestType === 6 ? 'SHA-256' : digestType === 7 ? 'SHA-384' : 'SHA-512';
             const stream = new crypto.DigestStream(digestName);
             const writer = stream.getWriter();
