@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
+
+#ifdef USESUBTLECB
 #include <wolfssl/wolfcrypt/cryptocb.h>
+#endif
 
 byte rootCert[] =
     "-----BEGIN CERTIFICATE-----\n"
@@ -198,102 +201,104 @@ EM_ASYNC_JS(int, jsAesGcmDecrypt, (
     }    
 });
 
-int cryptCb(int devId, wc_CryptoInfo *info, void* ctx) {
-    // TODO: test for WC_ALGO_TYPE_SEED here instead of patching WolfSSL source?
-    if (info->algo_type == WC_ALGO_TYPE_CIPHER && info->cipher.type == WC_CIPHER_AES_GCM) {
-        if (info->cipher.enc == 1) {
-            #ifdef CHATTY
-                printf("AES_GCM  enc: %i  rounds: %i  keylen: %i  out: %p  in: %p  sz: %i  iv: %p  ivSz: %i  authTag: %p  authTagSz: %i  authIn: %p  authInSz: %i\n", 
-                info->cipher.enc, 
-                info->cipher.aesgcm_enc.aes->rounds,
-                info->cipher.aesgcm_enc.aes->keylen,
-                info->cipher.aesgcm_enc.out,
-                info->cipher.aesgcm_enc.in,
-                info->cipher.aesgcm_enc.sz,
-                info->cipher.aesgcm_enc.iv,
-                info->cipher.aesgcm_enc.ivSz,
-                info->cipher.aesgcm_enc.authTag,
-                info->cipher.aesgcm_enc.authTagSz,
-                info->cipher.aesgcm_enc.authIn,
-                info->cipher.aesgcm_enc.authInSz
-                );
-            #endif
+#ifdef USESUBTLECB
+    int cryptCb(int devId, wc_CryptoInfo *info, void* ctx) {
+        // TODO: test for WC_ALGO_TYPE_SEED here instead of patching WolfSSL source?
+        if (info->algo_type == WC_ALGO_TYPE_CIPHER && info->cipher.type == WC_CIPHER_AES_GCM) {
+            if (info->cipher.enc == 1) {
+                #ifdef CHATTY
+                    printf("AES_GCM  enc: %i  rounds: %i  keylen: %i  out: %p  in: %p  sz: %i  iv: %p  ivSz: %i  authTag: %p  authTagSz: %i  authIn: %p  authInSz: %i\n", 
+                    info->cipher.enc, 
+                    info->cipher.aesgcm_enc.aes->rounds,
+                    info->cipher.aesgcm_enc.aes->keylen,
+                    info->cipher.aesgcm_enc.out,
+                    info->cipher.aesgcm_enc.in,
+                    info->cipher.aesgcm_enc.sz,
+                    info->cipher.aesgcm_enc.iv,
+                    info->cipher.aesgcm_enc.ivSz,
+                    info->cipher.aesgcm_enc.authTag,
+                    info->cipher.aesgcm_enc.authTagSz,
+                    info->cipher.aesgcm_enc.authIn,
+                    info->cipher.aesgcm_enc.authInSz
+                    );
+                #endif
 
-            jsAesGcmEncrypt(
-                info->cipher.aesgcm_enc.in, 
-                info->cipher.aesgcm_enc.sz, 
-                (byte *)info->cipher.aesgcm_enc.aes->devKey, 
-                info->cipher.aesgcm_enc.aes->keylen,
-                info->cipher.aesgcm_enc.iv, 
-                info->cipher.aesgcm_enc.ivSz, 
-                info->cipher.aesgcm_enc.authIn, 
-                info->cipher.aesgcm_enc.authInSz, 
-                info->cipher.aesgcm_enc.authTag, 
-                info->cipher.aesgcm_enc.authTagSz, 
-                info->cipher.aesgcm_enc.out
-            );
+                jsAesGcmEncrypt(
+                    info->cipher.aesgcm_enc.in, 
+                    info->cipher.aesgcm_enc.sz, 
+                    (byte *)info->cipher.aesgcm_enc.aes->devKey, 
+                    info->cipher.aesgcm_enc.aes->keylen,
+                    info->cipher.aesgcm_enc.iv, 
+                    info->cipher.aesgcm_enc.ivSz, 
+                    info->cipher.aesgcm_enc.authIn, 
+                    info->cipher.aesgcm_enc.authInSz, 
+                    info->cipher.aesgcm_enc.authTag, 
+                    info->cipher.aesgcm_enc.authTagSz, 
+                    info->cipher.aesgcm_enc.out
+                );
+
+            } else {
+                #ifdef CHATTY
+                    printf("AES_GCM  enc: %i  rounds: %i  keylen: %i  out: %p  in: %p  sz: %i  iv: %p  ivSz: %i  authTag: %p  authTagSz: %i  authIn: %p  authInSz: %i\n", 
+                    info->cipher.enc, 
+                    info->cipher.aesgcm_dec.aes->rounds,
+                    info->cipher.aesgcm_dec.aes->keylen,
+                    info->cipher.aesgcm_dec.out,
+                    info->cipher.aesgcm_dec.in,
+                    info->cipher.aesgcm_dec.sz,
+                    info->cipher.aesgcm_dec.iv,
+                    info->cipher.aesgcm_dec.ivSz,
+                    info->cipher.aesgcm_dec.authTag,
+                    info->cipher.aesgcm_dec.authTagSz,
+                    info->cipher.aesgcm_dec.authIn,
+                    info->cipher.aesgcm_dec.authInSz
+                    );
+                #endif
+
+                int result = jsAesGcmDecrypt(
+                    info->cipher.aesgcm_dec.in, 
+                    info->cipher.aesgcm_dec.sz, 
+                    (byte *)info->cipher.aesgcm_dec.aes->devKey, 
+                    info->cipher.aesgcm_dec.aes->keylen,
+                    info->cipher.aesgcm_dec.iv, 
+                    info->cipher.aesgcm_dec.ivSz, 
+                    info->cipher.aesgcm_dec.authIn, 
+                    info->cipher.aesgcm_dec.authInSz, 
+                    info->cipher.aesgcm_dec.authTag, 
+                    info->cipher.aesgcm_dec.authTagSz, 
+                    info->cipher.aesgcm_dec.out
+                );
+                if (result == -1) return AES_GCM_AUTH_E;
+
+            }
+            return 0;
+
+        } else if (info->algo_type == WC_ALGO_TYPE_HASH && (
+            info->hash.type == WC_HASH_TYPE_SHA ||
+            info->hash.type == WC_HASH_TYPE_SHA256 || 
+            info->hash.type == WC_HASH_TYPE_SHA384 || 
+            info->hash.type == WC_HASH_TYPE_SHA512)) {
+
+            int shaVersion = 
+            info->hash.type == WC_HASH_TYPE_SHA256 ? 256 :
+            info->hash.type == WC_HASH_TYPE_SHA384 ? 384 : 
+            info->hash.type == WC_HASH_TYPE_SHA512 ? 512 : 1;
+            
+            jsSha(shaVersion, info->hash.in, info->hash.inSz, info->hash.digest);
+            return 0;
 
         } else {
             #ifdef CHATTY
-                printf("AES_GCM  enc: %i  rounds: %i  keylen: %i  out: %p  in: %p  sz: %i  iv: %p  ivSz: %i  authTag: %p  authTagSz: %i  authIn: %p  authInSz: %i\n", 
-                info->cipher.enc, 
-                info->cipher.aesgcm_dec.aes->rounds,
-                info->cipher.aesgcm_dec.aes->keylen,
-                info->cipher.aesgcm_dec.out,
-                info->cipher.aesgcm_dec.in,
-                info->cipher.aesgcm_dec.sz,
-                info->cipher.aesgcm_dec.iv,
-                info->cipher.aesgcm_dec.ivSz,
-                info->cipher.aesgcm_dec.authTag,
-                info->cipher.aesgcm_dec.authTagSz,
-                info->cipher.aesgcm_dec.authIn,
-                info->cipher.aesgcm_dec.authInSz
-                );
+                printf("cb: algo_type %i\n", info->algo_type);
+                if (info->algo_type == WC_ALGO_TYPE_HASH) printf("hash.type %i\n\n", info->hash.type);
+                if (info->algo_type == WC_ALGO_TYPE_PK) printf("pk.type %i\n\n", info->pk .type);
+                if (info->algo_type == WC_ALGO_TYPE_HMAC) printf("hmac.macType %i\n\n", info->hmac.macType);
+                // potential further ops are ECC keygen (3, 9), ECDH (3, 3), RSA (3, 1) and SHA256-HMAC (6, 6)
             #endif
-
-            int result = jsAesGcmDecrypt(
-                info->cipher.aesgcm_dec.in, 
-                info->cipher.aesgcm_dec.sz, 
-                (byte *)info->cipher.aesgcm_dec.aes->devKey, 
-                info->cipher.aesgcm_dec.aes->keylen,
-                info->cipher.aesgcm_dec.iv, 
-                info->cipher.aesgcm_dec.ivSz, 
-                info->cipher.aesgcm_dec.authIn, 
-                info->cipher.aesgcm_dec.authInSz, 
-                info->cipher.aesgcm_dec.authTag, 
-                info->cipher.aesgcm_dec.authTagSz, 
-                info->cipher.aesgcm_dec.out
-            );
-            if (result == -1) return AES_GCM_AUTH_E;
-
+            return CRYPTOCB_UNAVAILABLE;
         }
-        return 0;
-
-    } else if (info->algo_type == WC_ALGO_TYPE_HASH && (
-        info->hash.type == WC_HASH_TYPE_SHA ||
-        info->hash.type == WC_HASH_TYPE_SHA256 || 
-        info->hash.type == WC_HASH_TYPE_SHA384 || 
-        info->hash.type == WC_HASH_TYPE_SHA512)) {
-
-        int shaVersion = 
-          info->hash.type == WC_HASH_TYPE_SHA256 ? 256 :
-          info->hash.type == WC_HASH_TYPE_SHA384 ? 384 : 
-          info->hash.type == WC_HASH_TYPE_SHA512 ? 512 : 1;
-        
-        jsSha(shaVersion, info->hash.in, info->hash.inSz, info->hash.digest);
-        return 0;
-
-    } else {
-        #ifdef CHATTY
-            printf("cb: algo_type %i\n", info->algo_type);
-            if (info->algo_type == WC_ALGO_TYPE_HASH) printf("hash.type %i\n\n", info->hash.type);
-            if (info->algo_type == WC_ALGO_TYPE_PK) printf("pk.type %i\n\n", info->pk .type);
-            if (info->algo_type == WC_ALGO_TYPE_HMAC) printf("hmac.macType %i\n\n", info->hmac.macType);
-            // potential further ops are ECC keygen (3, 9), ECDH (3, 3), RSA (3, 1) and SHA256-HMAC (6, 6)
-        #endif
-        return CRYPTOCB_UNAVAILABLE;
     }
-}
+#endif
 
 int initTls(char *tlsHost) {
     #ifdef CHATTY
@@ -336,21 +341,23 @@ int initTls(char *tlsHost) {
         goto exit;
     }
 
-    #ifdef CHATTY
-        puts("Registering callback ...");
+    #ifdef USESUBTLECB
+        #ifdef CHATTY
+            puts("Registering callback ...");
+        #endif
+        int devId = 1;
+        wc_CryptoCb_RegisterDevice(devId, &cryptCb, NULL);
+        ret = wolfSSL_SetDevId(ssl, devId);
+        if (ret != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "ERROR: failed to register callback.\n");
+            goto exit;
+        }
     #endif
-    int devId = 1;
-    wc_CryptoCb_RegisterDevice(devId, &cryptCb, NULL);
-    ret = wolfSSL_SetDevId(ssl, devId);
-    if (ret != WOLFSSL_SUCCESS) {
-        fprintf(stderr, "ERROR: failed to register callback.\n");
-        goto exit;
-    }
 
     #ifdef CHATTY
         puts("Setting ciphers ...");
     #endif
-    ret = wolfSSL_set_cipher_list(ssl, "TLS13-AES128-GCM-SHA256:TLS13-AES256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256");
+    ret = wolfSSL_set_cipher_list(ssl, "TLS13-CHACHA20-POLY1305-SHA256:TLS13-AES128-GCM-SHA256:TLS13-AES256-GCM-SHA384");
     if (ret != WOLFSSL_SUCCESS) {
         fprintf(stderr, "ERROR: failed to set ciphers\n");
         goto exit;
@@ -414,5 +421,10 @@ int writeData(char *buff, int sz) {
     if (ret != sz) {
         fprintf(stderr, "ERROR: failed to write\n");
     }
+    return ret;
+}
+
+int pending() {
+    ret = wolfSSL_pending(ssl);
     return ret;
 }
