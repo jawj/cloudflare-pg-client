@@ -428,3 +428,8 @@ int pending() {
     ret = wolfSSL_pending(ssl);
     return ret;
 }
+
+int shutdown() {
+    ret = wolfSSL_shutdown(ssl);
+    return ret;
+}
