@@ -300,7 +300,7 @@ EM_ASYNC_JS(int, jsAesGcmDecrypt, (
     }
 #endif
 
-int initTls(char *tlsHost) {
+int initTls(char *tlsHost, int disableSNI) {
     #ifdef CHATTY
         puts("WolfSSL initializing ...");
     #endif
@@ -363,13 +363,15 @@ int initTls(char *tlsHost) {
         goto exit;
     }
 
-    #ifdef CHATTY
-        puts("Enabling SNI ...");
-    #endif
-    ret = wolfSSL_UseSNI(ssl, WOLFSSL_SNI_HOST_NAME, tlsHost, strlen(tlsHost));
-    if (ret != WOLFSSL_SUCCESS) {
-        fprintf(stderr, "ERROR: failed to set host for SNI\n");
-        goto exit;
+    if (disableSNI == 0) {
+        #ifdef CHATTY
+            puts("Enabling SNI ...");
+        #endif
+        ret = wolfSSL_UseSNI(ssl, WOLFSSL_SNI_HOST_NAME, tlsHost, strlen(tlsHost));
+        if (ret != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "ERROR: failed to set host for SNI\n");
+            goto exit;
+        }
     }
 
     #ifdef CHATTY
