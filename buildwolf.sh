@@ -11,7 +11,7 @@ if [ "$1" != "quick" ]; then
       -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sDYNAMIC_EXECUTION=0 \
       -sNO_FILESYSTEM=1 -sENVIRONMENT=web \
       -sMODULARIZE=1 -sEXPORT_NAME=tls_emscripten \
-      -Oz -flto # -DCHATTY -DUSESUBTLECB
+      -Oz -flto -DUSESUBTLECB # -DCHATTY
 
   echo "Fixing up exports ..."
   sed \

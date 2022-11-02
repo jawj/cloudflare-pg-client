@@ -26,7 +26,7 @@ emconfigure ./configure \
   --disable-asm --enable-fastmath --enable-static --disable-shared \
   CFLAGS="-DWOLFSSL_USER_IO -DSINGLETHREADED -DWOLFSSL_TLS13_MIDDLEBOX_COMPAT -DWOLFSSL_NO_ASYNC_IO -DNO_PSK \
     -DNO_WRITEV -DNO_WOLFSSL_SERVER -DNO_ERROR_STRINGS -DNO_DEV_RANDOM -DNO_DEV_URANDOM \
-    -Oz -I../emsdk/upstream/emscripten/cache/sysroot/include -flto" # --enable-cryptocb
+    -Oz -I../emsdk/upstream/emscripten/cache/sysroot/include -flto" --enable-cryptocb
 
 echo "Building ..."
 emmake make 
