@@ -11,6 +11,11 @@ WOLFSSL_CTX *ctx = NULL;
 WOLFSSL *ssl = NULL;
 int ret;
 size_t len;
+int hasDigestStream;
+
+EM_JS(int, checkForDigestStream, (), {
+    return crypto.DigestStream === undefined ? 0 : 1;
+});
 
 EM_ASYNC_JS(int, jsProvideEncryptedFromNetwork, (char *buff, int sz), {
     const bytesRead = await Module.provideEncryptedFromNetwork(buff, sz);
@@ -70,7 +75,7 @@ void cleanup() {
 
 EM_ASYNC_JS(void, jsSha, (int shaVersion, const byte *buffDataIn, int sz, byte *buffDigest), {
     #ifdef CHATTY
-        console.log('crypto.subtle SHAx', digestType, buffDataIn, sz, buffDigest);
+        console.log('crypto.subtle SHAx', shaVersion, buffDataIn, sz, buffDigest);
     #endif
     if (buffDataIn !== 0) {  // writing data
         if (Module._digestStream == null) {  // deliberate loose equality
@@ -240,7 +245,7 @@ EM_ASYNC_JS(int, jsAesGcmDecrypt, (
             }
             return 0;
 
-        } else if (info->algo_type == WC_ALGO_TYPE_HASH && (
+        } else if (hasDigestStream && info->algo_type == WC_ALGO_TYPE_HASH && (
             info->hash.type == WC_HASH_TYPE_SHA ||
             info->hash.type == WC_HASH_TYPE_SHA256 || 
             info->hash.type == WC_HASH_TYPE_SHA384 || 
@@ -268,6 +273,8 @@ EM_ASYNC_JS(int, jsAesGcmDecrypt, (
 #endif
 
 int initTls(char *tlsHost, const unsigned char *rootCert, int rootCertLength, int disableSNI) {
+    hasDigestStream = checkForDigestStream();
+
     #ifdef CHATTY
         puts("WolfSSL initializing ...");
     #endif
